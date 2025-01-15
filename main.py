@@ -6,7 +6,7 @@ import networkx as nx
 from queue import PriorityQueue
 from timeout_decorator import timeout, TimeoutError
 
-TIME_LIMIT = 120  # Tempo limite de execução (segundos)
+TIME_LIMIT = 5  # Tempo limite de execução (segundos)
 
 def read_tsp_file(path):
     """
@@ -281,9 +281,10 @@ def twice_around_tree(cities_distances):
             cities_graph.add_edge(i, j, weight=cities_distances[i, j])
 
     mst = nx.minimum_spanning_tree(cities_graph)
-    
+
     # Percorrendo um circuito euleriando na MST com arestas duplicadas, removendo vértices duplicados
-    traversal = pre_order_dfs(mst, mst.nodes[0])
+    starting_node = next(iter(mst.nodes))
+    traversal = pre_order_dfs(mst, starting_node)
     
     # Fechando o ciclo do TS e computando seu custo
     complete_ts_tour = traversal + [traversal[0]]
@@ -364,7 +365,8 @@ def christofides(cities_distances):
 
 
     # Computando um caminho euleriano no grafo resultante e removendo vértices repetidos (válido pela desigualdade triangular)
-    euleurian_circuit = compute_eulerian_circuit(mst_min_match, mst_min_match.nodes[0])
+    starting_node = next(iter(mst_min_match.nodes))
+    euleurian_circuit = compute_eulerian_circuit(mst_min_match, starting_node)
 
     seen_vertices = set()
     
@@ -498,4 +500,4 @@ def run_experiments(dataset_dir, opt_solutions, output_file="results.csv"):
 if __name__ == "__main__":
     opt_file = "optimal_solutions.txt"
     optimal_solutions = load_optimal_solutions(opt_file)
-    run_experiments("small", optimal_solutions, 'csv_teste.csv')
+    run_experiments("small", optimal_solutions, 'small_folder_tests.csv')
