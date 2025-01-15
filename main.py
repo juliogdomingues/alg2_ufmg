@@ -6,7 +6,7 @@ import networkx as nx
 from queue import PriorityQueue
 from timeout_decorator import timeout, TimeoutError
 
-TIME_LIMIT = 5  # Tempo limite de execução (segundos)
+TIME_LIMIT = 10  # Tempo limite de execução (segundos)
 
 def read_tsp_file(path):
     """
@@ -500,4 +500,4 @@ def run_experiments(dataset_dir, opt_solutions, output_file="results.csv"):
 if __name__ == "__main__":
     opt_file = "optimal_solutions.txt"
     optimal_solutions = load_optimal_solutions(opt_file)
-    run_experiments("small", optimal_solutions, 'small_folder_tests.csv')
+    run_experiments("all_tsp", optimal_solutions, 'results.csv')
