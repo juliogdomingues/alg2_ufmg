@@ -6,7 +6,7 @@ import networkx as nx
 from queue import PriorityQueue
 from timeout_decorator import timeout, TimeoutError
 
-TIME_LIMIT = 10  # Tempo limite de execução (segundos)
+TIME_LIMIT = 60 * 30  # Tempo limite de execução (segundos)
 
 def read_tsp_file(path):
     """
