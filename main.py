@@ -1,12 +1,13 @@
 import os
 import time
+import math
 import tracemalloc
 import numpy as np
 import networkx as nx
 from queue import PriorityQueue
 from timeout_decorator import timeout, TimeoutError
 
-TIME_LIMIT = 60 * 30  # Tempo limite de execução (segundos)
+TIME_LIMIT = 10  # Tempo limite de execução (segundos)
 
 def read_tsp_file(path):
     """
@@ -173,7 +174,7 @@ def compute_bound(cities_distances, current_path):
         for cost in best_non_visited_paths:
             bound += cost
 
-    return bound
+    return math.ceil(bound/2)
 
 @timeout(TIME_LIMIT)
 def branch_and_bound(cities_distances):
