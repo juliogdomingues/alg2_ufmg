@@ -121,46 +121,124 @@ def bnb_algorithm(mat):
     print("Branch-and-Bound concluído.")
     return best_cost
 
-@timeout(TIME_LIMIT)
-def tat_algorithm(mat):
-    """Twice-Around-the-Tree."""
-    print("Executando Twice-Around-the-Tree...")
-    n = len(mat)
-    g = nx.Graph()
-    for i in range(n):
-        for j in range(i+1, n):
-            g.add_edge(i, j, weight=mat[i, j])
-    mst = nx.minimum_spanning_tree(g)
-    traversal = list(nx.dfs_preorder_nodes(mst, source=0))
-    tour = traversal + [traversal[0]]
-    print("Twice-Around-the-Tree concluído.")
-    return sum(mat[tour[i], tour[i+1]] for i in range(len(tour)-1))
+def pre_order_dfs(graph, starting_node):
+    # Controle dos vértices já visitados
+    seen_vertices = set()
+
+    traversal = []
+    def dfs(node):
+        if node not in seen_vertices:
+            # Visitando primeiramente o nó pai (pois é um caminhamento em pré-ordem)
+            seen_vertices.add(node)
+            traversal.append(node)
+
+            # Em sequência, visitando os filhos em ordem
+            for neighbor in graph.neighbors(node):
+                dfs(neighbor)
+    
+    dfs(starting_node)
+
+    return traversal
 
 @timeout(TIME_LIMIT)
-def christofides_algorithm(mat):
-    """Christofides."""
+def twice_around_tree(cities_distances):
+    print("Executando Twice-Around-the-Tree...")
+
+    cities_graph = nx.Graph()
+
+    num_cities = len(cities_distances)
+    # Adicionando as rotas entre as cidades ao grafo acima sem duplicá-las
+    for i in range(num_cities):
+        for j in range(i+1, num_cities):
+            cities_graph.add_edge(i, j, weight=cities_distances[i, j])
+
+    mst = nx.minimum_spanning_tree(cities_graph)
+    
+    #traversal = list(nx.dfs_preorder_nodes(mst, source=0))
+    
+    # Computando uma Depth-First Search em pré-ordem no grafo
+    # É o equivalente a encontrar um circuito Euleriano na MST com as arestas duplicadas e posteriormente percorrer o mesmo removendo arestas repetidas
+    traversal = pre_order_dfs(mst, mst.nodes[0])
+    
+    # Fechando o ciclo do TS e computando seu custo
+    complete_ts_tour = traversal + [traversal[0]]
+
+    tour_length = len(complete_ts_tour)
+    tour_cost = sum(cities_distances[complete_ts_tour[i], complete_ts_tour[i+1]] for i in range(tour_length-1))
+                      
+    print("Twice-Around-the-Tree concluído.")
+
+    return tour_cost
+
+def compute_eulerian_circuit(graph, starting_node):
+    nodes_visiting_stack = [starting_node]
+
+    current_path = []
+    while nodes_visiting_stack:
+        # Consultando o nó no topo da lista
+        current_node = nodes_visiting_stack[-1]
+        neighbors = list(graph.neighbors(current_node))
+        
+        if neighbors:
+            next_node = neighbors[0]
+            graph.remove_edge(current_node, next_node)
+            nodes_visiting_stack.append(next_node)
+        else:
+            # Voltando para o vértice pai, caso não tenhamos outra opção
+            current_path.append(nodes_visiting_stack.pop())
+
+    eulerian_circuit = []  # Stores the sequence of edges in the Eulerian circuit
+    for i in range(len(current_path) - 1):
+        eulerian_circuit.append((current_path[i], current_path[i + 1]))
+    
+    return eulerian_circuit
+
+@timeout(TIME_LIMIT)
+def christofides(cities_distances):
     print("Executando Christofides...")
-    n = len(mat)
-    g = nx.Graph()
-    for i in range(n):
-        for j in range(i+1, n):
-            g.add_edge(i, j, weight=mat[i, j])
-    mst = nx.minimum_spanning_tree(g)
-    odd_nodes = [v for v, deg in mst.degree() if deg % 2 == 1]
-    subg = g.subgraph(odd_nodes)
-    matching = nx.algorithms.matching.min_weight_matching(subg, weight='weight')
-    mst_aug = nx.MultiGraph(mst)
-    mst_aug.add_edges_from(matching)
-    euler_circuit = list(nx.eulerian_circuit(mst_aug))
-    path = []
-    visited = set()
-    for u, _ in euler_circuit:
-        if u not in visited:
-            path.append(u)
-            visited.add(u)
-    path.append(path[0])
+
+    cities_graph = nx.Graph()
+
+    num_cities = len(cities_distances)
+    # Adicionando as rotas entre as cidades ao grafo acima sem duplicá-las
+    for i in range(num_cities):
+        for j in range(i+1, num_cities):
+            cities_graph.add_edge(i, j, weight=cities_distances[i, j])
+
+    mst = nx.minimum_spanning_tree(cities_graph)
+
+    # Selecionando apenas os nós de grau ímpar da MST e computando o emparelhamento de custo mínimo no subgrafo induzido por eles
+    odd_degree_nodes = [v for v, deg in mst.degree() if deg % 2 == 1]
+
+    odd_degree_nodes_subgraph = cities_graph.subgraph(odd_degree_nodes)
+
+    min_weight_matching = nx.algorithms.matching.min_weight_matching(odd_degree_nodes_subgraph, weight='weight')
+
+    # Combinando o emparelhamento com a MST
+    mst_min_match = nx.MultiGraph(mst)
+    mst_min_match.add_edges_from(min_weight_matching)
+
+    #euler_circuit = list(nx.eulerian_circuit(mst_min_match))
+    euleurian_circuit = compute_eulerian_circuit(mst_min_match, mst_min_match.nodes[0])
+
+    # Removendo vértices duplicados no caminho euleriano (válido pela desigualdade triangular)
+    seen_vertices = set()
+    
+    traversal = []
+    for u, _ in euleurian_circuit:
+        if u not in seen_vertices:
+            traversal.append(u)
+            seen_vertices.add(u)
+
+     # Fechando o ciclo do TS
+    complete_ts_tour = traversal + [traversal[0]]
+    
+    tour_length = len(complete_ts_tour)
+    tour_cost = sum(cities_distances[complete_ts_tour[i], complete_ts_tour[i+1]] for i in range(tour_length-1))
+
     print("Christofides concluído.")
-    return sum(mat[path[i], path[i+1]] for i in range(len(path)-1))
+
+    return tour_cost
 
 def list_instances(directory):
     """Lista instâncias disponíveis no diretório."""
@@ -221,7 +299,7 @@ def run_experiments(dataset_dir, opt_solutions, output_file="results.csv"):
 
         # TAT
         try:
-            tat_cost, tat_time, tat_mem = measure_memory_and_time(tat_algorithm, mat)
+            tat_cost, tat_time, tat_mem = measure_memory_and_time(twice_around_tree, mat)
             print(f"Twice-Around-the-Tree finalizado: Custo = {tat_cost}")
         except Exception as e:
             tat_cost, tat_time, tat_mem = 'NA', 'NA', 'NA'
@@ -230,7 +308,7 @@ def run_experiments(dataset_dir, opt_solutions, output_file="results.csv"):
 
         # Christofides
         try:
-            christ_cost, christ_time, christ_mem = measure_memory_and_time(christofides_algorithm, mat)
+            christ_cost, christ_time, christ_mem = measure_memory_and_time(christofides, mat)
             print(f"Christofides finalizado: Custo = {christ_cost}")
         except Exception as e:
             christ_cost, christ_time, christ_mem = 'NA', 'NA', 'NA'
