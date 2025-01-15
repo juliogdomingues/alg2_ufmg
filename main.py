@@ -6,10 +6,19 @@ import networkx as nx
 from queue import PriorityQueue
 from timeout_decorator import timeout, TimeoutError
 
-TIME_LIMIT = 10  # Tempo limite de execução (segundos)
+TIME_LIMIT = 120  # Tempo limite de execução (segundos)
 
 def read_tsp_file(path):
-    """Lê coordenadas de arquivos TSPLIB."""
+    """
+    Lê as coordenadas dos nós a partir de um arquivo TSPLIB.
+    
+    Parâmetros:
+    path: Caminho para o arquivo `.tsp` que contém as coordenadas dos nós.
+    
+    Retorno:
+    coords: Lista contendo as coordenadas dos nós como tuplas de floats (x, y).
+          Retorna uma lista vazia se o arquivo não for encontrado ou ocorrer um erro.
+    """
     coords = []
     parsing = False
     try:
@@ -31,7 +40,16 @@ def read_tsp_file(path):
     return coords
 
 def load_optimal_solutions(path):
-    """Carrega soluções ótimas de um arquivo."""
+    """
+    Carrega as soluções ótimas de um arquivo, associando o nome da instância ao seu custo ótimo.
+    
+    Parâmetros:
+    path: Caminho para o arquivo que contém as soluções ótimas.
+    
+    Retorno:
+    sols: Dicionário onde as chaves são os nomes das instâncias e os valores são os custos ótimos correspondentes.
+          Retorna um dicionário vazio se o arquivo não for encontrado ou ocorrer um erro.
+    """
     sols = {}
     if not os.path.isfile(path):
         print(f"Arquivo de soluções ótimas não encontrado: {path}")
@@ -48,7 +66,16 @@ def load_optimal_solutions(path):
     return sols
 
 def create_distance_matrix(coords):
-    """Gera matriz de distâncias euclidianas."""
+    """
+    Gera uma matriz de distâncias euclidianas entre os pontos dados.
+    
+    Parâmetros:
+    coords: Lista de tuplas (x, y) representando as coordenadas dos pontos.
+    
+    Retorno:
+    mat: Matriz de distâncias entre os pontos, onde o valor na posição [i][j] é a distância 
+                euclidiana entre o ponto i e o ponto j.
+    """
     n = len(coords)
     mat = np.zeros((n, n))
     for i in range(n):
@@ -59,13 +86,21 @@ def create_distance_matrix(coords):
     return mat
 
 def measure_memory_and_time(func, *args, **kwargs):
-    """Mede tempo e pico de memória durante o algoritmo.
-    Retorna:
-        - result: resultado da função
-        - elapsed_time: tempo em segundos
-        - peak_mem: pico de memória em KB (kilobytes)
+    """
+    Mede o tempo de execução e o pico de memória utilizado durante a execução de uma função.
+    
+    Parâmetros:
+    func: Função a ser executada e medida.
+    *args, **kwargs: Argumentos e parâmetros a serem passados para a função.
+    
+    Retorno:
+    tuple: Tupla contendo três valores:
+            - result: Resultado da execução da função.
+            - elapsed_time: Tempo de execução em segundos.
+            - peak_mem: Pico de memória utilizado em KB.    
     """
     tracemalloc.start()
+
     try:
         start_time = time.time()  # Tempo em segundos desde epoch
         result = func(*args, **kwargs)
@@ -75,78 +110,171 @@ def measure_memory_and_time(func, *args, **kwargs):
     finally:
         tracemalloc.stop()
 
-@timeout(TIME_LIMIT)
-def bnb_algorithm(mat):
-    """Branch-and-Bound."""
-    print("Executando Branch-and-Bound...")
-    best_cost = float('inf')
-    n = len(mat)
+class Node:
+    """
+    Representa um nó no algoritmo Branch-and-Bound para resolver o problema do Caixeiro Viajante (TSP).
     
-    # Pré-calcula as distâncias ordenadas para cada cidade
-    sorted_distances = [sorted([mat[i][j] for j in range(n) if j != i]) for i in range(n)]
-    best_edges = [row[0] + row[1] for row in sorted_distances]
+    Atributos:
+    current_path: Lista de vértices representando o caminho percorrido até o momento.
+    level: Nível no qual o nó se encontra (número de vértices no caminho).
+    current_path_cost: Custo total do caminho até o momento.
+    bound: Estimativa inferior para o custo do caminho completo a partir deste nó.
+    
+    Métodos:
+    __lt__(self, other): Compara dois nós com base no bound (utilizado para priorizar nós na fila de prioridades).
+    """
+    def __init__(self, current_path, level, cities_distances):
+        self.current_path = current_path
+        self.level = level
+        self.current_path_cost = 0 
+        if len(current_path) > 1: 
+            self.current_path_cost = sum([cities_distances[current_path[i], current_path[i+1]] for i in range(len(current_path)-1)])
+        self.bound = compute_bound(cities_distances, current_path)
 
-    class Node:
-        def __init__(self, path, cost, level):
-            self.path = path
-            self.cost = cost
-            self.level = level
-            self.bound = calculate_bound(mat, path, best_edges)
+    def __lt__(self, other):
+        return self.bound < other.bound
 
-        def __lt__(self, other):
-            return self.bound < other.bound
+def compute_bound(cities_distances, current_path):
+    """
+    Calcula uma estimativa inferior para o custo de um caminho baseado na matriz de distâncias.
+    
+    Parâmetros:
+    cities_distances: Matriz de distâncias entre os vértices.
+    current_path: Caminho até o momento representado por uma lista de índices de vértices.
+    
+    Retorno:
+    bound: Estimativa inferior para o custo do caminho completo, considerando os vértices já visitados e as menores distâncias 
+           não visitadas.
+    """
+    bound = 0
+    used_edges = set()
+    remaining_edges_per_vertex = np.full(len(cities_distances), 2)
+    
+    for i in range(len(current_path)-1):
+        remaining_edges_per_vertex[current_path[i]] -= 1
+        remaining_edges_per_vertex[current_path[i+1]] -= 1
 
-    def calculate_bound(mat, path, best_edges):
-        bound = sum(best_edges[i] for i in range(len(mat)) if i not in path) / 2
-        for i in range(len(path) - 1):
-            bound += mat[path[i], path[i + 1]]
-        return bound
+        used_edges.add((current_path[i], current_path[i+1]))
+        used_edges.add((current_path[i+1], current_path[i]))
 
+        bound += cities_distances[current_path[i], current_path[i+1]]
+
+    num_cities = len(cities_distances)
+    for i in range(num_cities):
+        current_city_non_visited_paths_costs = []
+
+        for j in range(num_cities):
+            if (i != j) and ((i, j) not in used_edges):
+                current_city_non_visited_paths_costs.append(cities_distances[i, j])
+
+        best_non_visited_paths = sorted(np.array(current_city_non_visited_paths_costs))
+        best_non_visited_paths = best_non_visited_paths[0:remaining_edges_per_vertex[i]]
+
+        for cost in best_non_visited_paths:
+            bound += cost
+
+    return bound
+
+@timeout(TIME_LIMIT)
+def branch_and_bound(cities_distances):
+    """
+    Função que computa um algoritmo Branch-and-Bound para o TSP.
+    
+    Parâmetros:
+    cities_distances: Matriz de distâncias entre os vértices.
+    
+    Retorno:
+    best_cost: Custo do caminho mais curto encontrado.
+    """
+    cities_distances = np.matrix(cities_distances)
+
+    best_cost = float('inf')
+    num_cities = len(cities_distances)
+
+    # Como exploraremos primeiro o nó de menor bound, empregaremos uma fila de prioridades    
     queue = PriorityQueue()
-    queue.put(Node([0], 0, 0))
+
+    # Sem perda de generalidade, podemos considerar que o tour começa no vértice arbitrário de índice 0
+    queue.put(Node(np.array([0]), 0, cities_distances))
 
     while not queue.empty():
-        current = queue.get()
-        if current.bound >= best_cost:
+        # Explorando o nó mais promissor de acordo com a estratégia Best-First
+        current_node = queue.get()
+
+        #print(f"Explorando o nó {current_node.current_path}!")
+
+        # Podando a árvore caso o bound é não menor do que o melhor caminho encontrado até então
+        if current_node.bound >= best_cost:
+            #print("Esse só não é promissor e será podado!")
             continue
-        if current.level == n - 1:
-            total_cost = current.cost + mat[current.path[-1], current.path[0]]
+        # Se chegamos no nível n-1, já que começamos do nível 0, podemos apenas retornar para o vértice inicial do caminho
+        elif current_node.level == num_cities - 1:
+            #print("Chegamos no último nível - iremos computar o custo do TSP!")
+            total_cost = current_node.current_path_cost + cities_distances[current_node.current_path[-1], current_node.current_path[0]]
             if total_cost < best_cost:
+                #print(f"Esse é o melhor tour até agora, com custo {total_cost}!")
                 best_cost = total_cost
+            else:
+                pass
+                #print(f"Esse tour não é mais barato do que já temos, já que ele tem custo {total_cost}!")
+        # Visitando todos os nós representando vértices que ainda não foram visitados no caminho atual
+        # Colocando cada nó na fila de prioridades de acordo com o seu bound estimado
         else:
-            for i in range(n):
-                if i not in current.path:
-                    cost_next = current.cost + mat[current.path[-1], i]
-                    queue.put(Node(current.path + [i], cost_next, current.level + 1))
-    print("Branch-and-Bound concluído.")
+            for i in range(num_cities):
+                if i not in current_node.current_path:
+                    new_path = np.append(current_node.current_path, i)
+                    queue.put(Node(new_path, current_node.level + 1, cities_distances))
+                    #print(f"Colocando {new_path} na fila!")
+
+    #print(f"Encontramos o caminho mais curto de custo {best_cost}!")
+
     return best_cost
 
-def pre_order_dfs(graph, starting_node):
+def pre_order_dfs(graph, starting_node):    
+    """
+    Função que computa uma Depth-First Search em pré-ordem em um grafo de entrada. 
+    
+    Parâmetros:
+    graph: Grafo alvo.
+    starting_node: Vértice em que iremos começar busca.
+    
+    Retorno:
+    traversal: Lista contendo os vértices na ordem em que foram visitados.
+    """
     # Controle dos vértices já visitados
     seen_vertices = set()
 
     traversal = []
-    def dfs(node):
+    def aux_pre_order_dfs(node):
         if node not in seen_vertices:
             # Visitando primeiramente o nó pai (pois é um caminhamento em pré-ordem)
             seen_vertices.add(node)
             traversal.append(node)
-
+            
             # Em sequência, visitando os filhos em ordem
             for neighbor in graph.neighbors(node):
-                dfs(neighbor)
-    
-    dfs(starting_node)
+                aux_pre_order_dfs(neighbor)
+
+    aux_pre_order_dfs(starting_node)
 
     return traversal
 
 @timeout(TIME_LIMIT)
 def twice_around_tree(cities_distances):
+    """
+    Função que computa o algoritmo aproximativo Twice-Around-the-Tree para o TSP.
+
+    Parâmetros:
+    cities_distances: Matriz de adjacência que represente a instância de interesse do TSP.
+
+    Retorno:
+    tour_cost: Custo do tour encontrado (que é até 2x pior do que o ótimo real).
+    """
     print("Executando Twice-Around-the-Tree...")
 
     cities_graph = nx.Graph()
-
     num_cities = len(cities_distances)
+
     # Adicionando as rotas entre as cidades ao grafo acima sem duplicá-las
     for i in range(num_cities):
         for j in range(i+1, num_cities):
@@ -154,10 +282,7 @@ def twice_around_tree(cities_distances):
 
     mst = nx.minimum_spanning_tree(cities_graph)
     
-    #traversal = list(nx.dfs_preorder_nodes(mst, source=0))
-    
-    # Computando uma Depth-First Search em pré-ordem no grafo
-    # É o equivalente a encontrar um circuito Euleriano na MST com as arestas duplicadas e posteriormente percorrer o mesmo removendo arestas repetidas
+    # Percorrendo um circuito euleriando na MST com arestas duplicadas, removendo vértices duplicados
     traversal = pre_order_dfs(mst, mst.nodes[0])
     
     # Fechando o ciclo do TS e computando seu custo
@@ -166,11 +291,21 @@ def twice_around_tree(cities_distances):
     tour_length = len(complete_ts_tour)
     tour_cost = sum(cities_distances[complete_ts_tour[i], complete_ts_tour[i+1]] for i in range(tour_length-1))
                       
-    print("Twice-Around-the-Tree concluído.")
+    print("Twice-Around-the-Tree concluído!")
 
     return tour_cost
 
 def compute_eulerian_circuit(graph, starting_node):
+    """
+    Função que gera um circuito euleriano em um grafo de entrada. 
+    
+    Parâmetros:
+    graph: Grafo alvo.
+    starting_node: Vértice em que iremos começar o circuito.
+    
+    Retorno:
+    traversal: Lista contendo uma sequência de vértices que formam um circuito euleriano.
+    """
     nodes_visiting_stack = [starting_node]
 
     current_path = []
@@ -187,7 +322,7 @@ def compute_eulerian_circuit(graph, starting_node):
             # Voltando para o vértice pai, caso não tenhamos outra opção
             current_path.append(nodes_visiting_stack.pop())
 
-    eulerian_circuit = []  # Stores the sequence of edges in the Eulerian circuit
+    eulerian_circuit = []
     for i in range(len(current_path) - 1):
         eulerian_circuit.append((current_path[i], current_path[i + 1]))
     
@@ -195,11 +330,20 @@ def compute_eulerian_circuit(graph, starting_node):
 
 @timeout(TIME_LIMIT)
 def christofides(cities_distances):
+    """
+    Função que computa o algoritmo aproximativo de Christofides para o TSP.
+
+    Parâmetros:
+    cities_distances: Matriz de adjacência que represente a instância de interesse do TSP.
+
+    Retorno:
+    tour_cost: Custo do tour encontrado (que é até 1.5x pior do que o ótimo real).
+    """
     print("Executando Christofides...")
 
     cities_graph = nx.Graph()
-
     num_cities = len(cities_distances)
+
     # Adicionando as rotas entre as cidades ao grafo acima sem duplicá-las
     for i in range(num_cities):
         for j in range(i+1, num_cities):
@@ -218,10 +362,10 @@ def christofides(cities_distances):
     mst_min_match = nx.MultiGraph(mst)
     mst_min_match.add_edges_from(min_weight_matching)
 
-    #euler_circuit = list(nx.eulerian_circuit(mst_min_match))
+
+    # Computando um caminho euleriano no grafo resultante e removendo vértices repetidos (válido pela desigualdade triangular)
     euleurian_circuit = compute_eulerian_circuit(mst_min_match, mst_min_match.nodes[0])
 
-    # Removendo vértices duplicados no caminho euleriano (válido pela desigualdade triangular)
     seen_vertices = set()
     
     traversal = []
@@ -241,7 +385,16 @@ def christofides(cities_distances):
     return tour_cost
 
 def list_instances(directory):
-    """Lista instâncias disponíveis no diretório."""
+    """
+    Lista as instâncias disponíveis no diretório, procurando por arquivos com a extensão '.tsp'.
+    
+    Parâmetros:
+    directory: Caminho para o diretório onde as instâncias estão armazenadas.
+    
+    Retorno:
+    list: Lista contendo os nomes das instâncias (sem a extensão '.tsp') encontradas no diretório.
+          Caso o diretório não seja encontrado, imprime uma mensagem de erro e retorna uma lista vazia.
+    """
     if not os.path.isdir(directory):
         print(f"Diretório não encontrado: {directory}")
         return []
@@ -252,15 +405,33 @@ def list_instances(directory):
     ]
 
 def ratio_to_optimum(found_cost, optimum):
-    """Calcula a razão entre custo encontrado e ótimo."""
+    """
+    Calcula a razão entre o custo encontrado e o custo ótimo, com precisão de 4 casas decimais.
+    
+    Parâmetros:
+    found_cost: Custo encontrado pela heurística ou algoritmo.
+    optimum: Custo ótimo conhecido para a instância do problema.
+    
+    Retorno:
+    float ou str: A razão entre o custo encontrado e o ótimo, arredondada para 4 casas decimais.
+                  Se algum dos valores for inválido (ex: 'NA', 0 ou valores não numéricos), retorna 'NA'.
+    """
     if found_cost == 'NA' or optimum == 'NA' or not isinstance(optimum, (int, float)) or optimum == 0:
         return 'NA'
     return round(found_cost / optimum, 4)
 
 def run_experiments(dataset_dir, opt_solutions, output_file="results.csv"):
-    """Executa experimentos e salva resultados.
-    Utiliza gerenciamento de contexto para garantir fechamento adequado dos arquivos.
     """
+    Executa experimentos para várias instâncias, utilizando diferentes algoritmos e salva os resultados em um arquivo CSV.
+    
+    Parâmetros:
+    dataset_dir: Diretório onde as instâncias do problema estão armazenadas.
+    opt_solutions: Dicionário com as soluções ótimas para as instâncias.
+    output_file: Nome do arquivo CSV onde os resultados serão salvos (padrão: "results.csv").
+    
+    Retorno:
+    None: A função salva os resultados no arquivo especificado e não retorna nenhum valor.
+    """    
     import contextlib
     
     @contextlib.contextmanager
@@ -290,7 +461,7 @@ def run_experiments(dataset_dir, opt_solutions, output_file="results.csv"):
 
         # Branch-and-Bound
         try:
-            bnb_cost, bnb_time, bnb_mem = measure_memory_and_time(bnb_algorithm, mat)
+            bnb_cost, bnb_time, bnb_mem = measure_memory_and_time(branch_and_bound, mat)
             print(f"Branch-and-Bound finalizado: Custo = {bnb_cost}")
         except TimeoutError:
             bnb_cost, bnb_time, bnb_mem = 'NA', 'NA', 'NA'
@@ -327,4 +498,4 @@ def run_experiments(dataset_dir, opt_solutions, output_file="results.csv"):
 if __name__ == "__main__":
     opt_file = "optimal_solutions.txt"
     optimal_solutions = load_optimal_solutions(opt_file)
-    run_experiments("all_tsp", optimal_solutions)
+    run_experiments("small", optimal_solutions, 'csv_teste.csv')
