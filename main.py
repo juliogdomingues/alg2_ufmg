@@ -627,11 +627,19 @@ def filter_2d_euc_tsp_instances(directory_path):
                 print(f"Error processing file {file_path}: {e}")
 
 if __name__ == "__main__":
-    # Removendo as instâncias cujas distâncias não são Euclidianas 2D
-    filter_2d_euc_tsp_instances('./all_tsp')
 
+    # Carrega as soluções ótimas
     opt_file = "optimal_solutions.txt"
     optimal_solutions = load_optimal_solutions(opt_file)
-    # run_experiments("all_tsp", optimal_solutions, 'results', 'tat')
-    # run_experiments("all_tsp", optimal_solutions, 'results', 'christ')
+
+    # Testes em instâncias pequenas
+    # filter_2d_euc_tsp_instances('./small')     # Remove as instâncias cujas distâncias não são Euclidianas 2D
+    # run_experiments("small", optimal_solutions, 'results_small', 'tat')
+    # run_experiments("small", optimal_solutions, 'results_small', 'christ')
+    # run_experiments("small", optimal_solutions, 'results_small', 'bnb')
+
+    # Testes em todas as instâncias
+    filter_2d_euc_tsp_instances('./all_tsp')     # Remove as instâncias cujas distâncias não são Euclidianas 2D
+    run_experiments("all_tsp", optimal_solutions, 'results', 'tat')
+    run_experiments("all_tsp", optimal_solutions, 'results', 'christ')
     run_experiments("all_tsp", optimal_solutions, 'results', 'bnb')
