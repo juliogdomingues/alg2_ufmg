@@ -633,5 +633,5 @@ if __name__ == "__main__":
     opt_file = "optimal_solutions.txt"
     optimal_solutions = load_optimal_solutions(opt_file)
     # run_experiments("all_tsp", optimal_solutions, 'results', 'tat')
-    run_experiments("all_tsp", optimal_solutions, 'results', 'christ')
+    # run_experiments("all_tsp", optimal_solutions, 'results', 'christ')
     run_experiments("all_tsp", optimal_solutions, 'results', 'bnb')
