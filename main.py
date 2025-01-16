@@ -75,7 +75,7 @@ def create_distance_matrix(coords):
     
     Retorno:
     mat: Matriz de distâncias entre os pontos, onde o valor na posição [i][j] é a distância 
-                euclidiana entre o ponto i e o ponto j.
+         euclidiana entre o ponto i e o ponto j.
     """
     n = len(coords)
     mat = np.zeros((n, n))
@@ -84,6 +84,7 @@ def create_distance_matrix(coords):
             dist = np.linalg.norm(np.array(coords[i]) - np.array(coords[j]))
             mat[i][j] = dist
             mat[j][i] = dist
+
     return mat
 
 def measure_memory_and_time(func, *args, **kwargs):
@@ -439,6 +440,7 @@ def ratio_to_optimum(found_cost, optimum):
         return 'NA'
     return round(found_cost / optimum, 4)
 
+'''
 def run_experiments(dataset_dir, opt_solutions, output_file="results.csv"):
     """
     Executa experimentos para várias instâncias, utilizando diferentes algoritmos e salva os resultados em um arquivo CSV.
@@ -513,6 +515,97 @@ def run_experiments(dataset_dir, opt_solutions, output_file="results.csv"):
                 f"{tat_cost},{tat_time},{tat_mem},{tat_ratio},"
                 f"{christ_cost},{christ_time},{christ_mem},{christ_ratio}\n"
             )
+'''
+
+def run_experiments(dataset_dir, opt_solutions, output_file_prefix="results", algorithm="all"):
+    """
+    Executa experimentos para várias instâncias usando algoritmos específicos e salva os resultados em arquivos CSV.
+    
+    Parâmetros:
+    dataset_dir: Diretório onde as instâncias do problema estão armazenadas.
+    opt_solutions: Dicionário com as soluções ótimas para as instâncias.
+    output_file_prefix: Prefixo do nome do arquivo CSV onde os resultados serão salvos (padrão: "results").
+    algorithm: Especifica o algoritmo a ser executado ('bnb', 'tat', 'christ', ou 'all' para executar todos).
+    
+    Retorno:
+    None: A função salva os resultados no arquivo especificado e não retorna nenhum valor.
+    """
+    import contextlib
+
+    def get_output_filename(algorithm):
+        return f"{output_file_prefix}_{algorithm}.csv"
+
+    @contextlib.contextmanager
+    def managed_file(filename, mode="a"):
+        f = open(filename, mode, buffering=1)  # Line buffering
+        try:
+            yield f
+        finally:
+            f.flush()
+            f.close()
+
+    # Header writing for each specified algorithm
+    if algorithm in ['bnb', 'tat', 'christ']:
+        with managed_file(get_output_filename(algorithm), "w") as f:
+            f.write("file,optimum,cost,time,mem,ratio\n")
+    elif algorithm == 'all':
+        with managed_file(get_output_filename("all"), "w") as f:
+            f.write("file,optimum,"
+                    "bnb_cost,bnb_time,bnb_mem,bnb_ratio,"
+                    "tat_cost,tat_time,tat_mem,tat_ratio,"
+                    "christ_cost,christ_time,christ_mem,christ_ratio\n")
+    
+    for inst in list_instances(dataset_dir):
+        print(f"\nProcessando instância: {inst}")
+        coords = read_tsp_file(os.path.join(dataset_dir, inst + ".tsp"))
+        if not coords:
+            print(f"Erro ao processar {inst}: coordenadas vazias.")
+            continue
+        mat = create_distance_matrix(coords)
+        optimum = opt_solutions.get(inst, 'NA')
+
+        def run_and_record(func, name):
+            try:
+                cost, time, mem = measure_memory_and_time(func, mat)
+                print(f"{name} finalizado: Custo = {cost}")
+            except Exception as e:
+                cost, time, mem = 'NA', 'NA', 'NA'
+                print(f"Erro em {name}: {e}")
+            ratio = ratio_to_optimum(cost, optimum)
+            return cost, time, mem, ratio
+
+        results = {}
+
+        if algorithm in ['all', 'bnb']:
+            bnb_results = run_and_record(branch_and_bound, "Branch-and-Bound")
+            if algorithm == 'bnb':
+                with managed_file(get_output_filename("bnb")) as f:
+                    f.write(f"{inst},{optimum},{','.join(map(str, bnb_results))}\n")
+            else:
+                results.update({f"bnb_{k}": v for k, v in zip(["cost", "time", "mem", "ratio"], bnb_results)})
+
+        if algorithm in ['all', 'tat']:
+            tat_results = run_and_record(twice_around_tree, "Twice-Around-the-Tree")
+            if algorithm == 'tat':
+                with managed_file(get_output_filename("tat")) as f:
+                    f.write(f"{inst},{optimum},{','.join(map(str, tat_results))}\n")
+            else:
+                results.update({f"tat_{k}": v for k, v in zip(["cost", "time", "mem", "ratio"], tat_results)})
+
+        if algorithm in ['all', 'christ']:
+            christ_results = run_and_record(christofides, "Christofides")
+            if algorithm == 'christ':
+                with managed_file(get_output_filename("christ")) as f:
+                    f.write(f"{inst},{optimum},{','.join(map(str, christ_results))}\n")
+            else:
+                results.update({f"christ_{k}": v for k, v in zip(["cost", "time", "mem", "ratio"], christ_results)})
+
+        if algorithm == 'all':
+            with managed_file(get_output_filename("all")) as f:
+                f.write(f"{inst},{optimum},"
+                        f"{results['bnb_cost']},{results['bnb_time']},{results['bnb_mem']},{results['bnb_ratio']},"
+                        f"{results['tat_cost']},{results['tat_time']},{results['tat_mem']},{results['tat_ratio']},"
+                        f"{results['christ_cost']},{results['christ_time']},{results['christ_mem']},{results['christ_ratio']}\n")
 
 def filter_2d_euc_tsp_instances(directory_path):
     for filename in os.listdir(directory_path):
@@ -534,7 +627,11 @@ def filter_2d_euc_tsp_instances(directory_path):
                 print(f"Error processing file {file_path}: {e}")
 
 if __name__ == "__main__":
+    # Removendo as instâncias cujas distâncias não são Euclidianas 2D
     filter_2d_euc_tsp_instances('./all_tsp')
+
     opt_file = "optimal_solutions.txt"
     optimal_solutions = load_optimal_solutions(opt_file)
-    run_experiments("all_tsp", optimal_solutions, 'results.csv')
+    run_experiments("all_tsp", optimal_solutions, 'results', 'tat')
+    run_experiments("all_tsp", optimal_solutions, 'results', 'christ')
+    run_experiments("all_tsp", optimal_solutions, 'results', 'bnb')
