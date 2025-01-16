@@ -7,7 +7,7 @@ import networkx as nx
 from queue import PriorityQueue
 from timeout_decorator import timeout, TimeoutError
 
-TIME_LIMIT = 10  # Tempo limite de execução (segundos)
+TIME_LIMIT = 20  # Tempo limite de execução (segundos)
 
 def read_tsp_file(path):
     """
@@ -498,7 +498,27 @@ def run_experiments(dataset_dir, opt_solutions, output_file="results.csv"):
                 f"{christ_cost},{christ_time},{christ_mem},{christ_ratio}\n"
             )
 
+def filter_2d_euc_tsp_instances(directory_path):
+    for filename in os.listdir(directory_path):
+        file_path = os.path.join(directory_path, filename)
+
+        # Check if it's a file (not a directory)
+        if os.path.isfile(file_path):
+            try:
+                with open(file_path, 'r') as file:
+                    lines = file.readlines()
+
+                    for line in lines:
+                        if line.startswith("EDGE_WEIGHT_TYPE"):
+                            if "EUC_2D" not in line:
+                                os.remove(file_path)
+                                print(f"Deleted file: {file_path}")
+                            break
+            except Exception as e:
+                print(f"Error processing file {file_path}: {e}")
+
 if __name__ == "__main__":
-    opt_file = "optimal_solutions.txt"
-    optimal_solutions = load_optimal_solutions(opt_file)
-    run_experiments("all_tsp", optimal_solutions, 'results.csv')
+    filter_2d_euc_tsp_instances('./all_tsp')
+    #opt_file = "optimal_solutions.txt"
+    #optimal_solutions = load_optimal_solutions(opt_file)
+    #run_experiments("all_tsp", optimal_solutions, 'results1.csv')
