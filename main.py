@@ -390,22 +390,38 @@ def christofides(cities_distances):
 def list_instances(directory):
     """
     Lista as instâncias disponíveis no diretório, procurando por arquivos com a extensão '.tsp'.
-    
+    Ordena os arquivos pela DIMENSION especificada no conteúdo de cada arquivo.
+
     Parâmetros:
     directory: Caminho para o diretório onde as instâncias estão armazenadas.
-    
+
     Retorno:
-    list: Lista contendo os nomes das instâncias (sem a extensão '.tsp') encontradas no diretório.
+    list: Lista contendo os nomes das instâncias (sem a extensão '.tsp') ordenadas pelo valor de DIMENSION.
           Caso o diretório não seja encontrado, imprime uma mensagem de erro e retorna uma lista vazia.
     """
     if not os.path.isdir(directory):
         print(f"Diretório não encontrado: {directory}")
         return []
-    return [
-        os.path.splitext(f)[0]
-        for f in os.listdir(directory)
-        if f.endswith('.tsp')
-    ]
+
+    instances = []
+
+    for f in os.listdir(directory):
+        if f.endswith('.tsp') and f != '.DS_Store':
+            file_path = os.path.join(directory, f)
+            try:
+                with open(file_path, 'r') as file:
+                    lines = file.readlines()
+                    for line in lines:
+                        if line.startswith("DIMENSION"):
+                            dimension = int(line.split(':')[1].strip())
+                            instances.append((os.path.splitext(f)[0], dimension))
+                            break
+            except Exception as e:
+                print(f"Erro ao processar o arquivo {f}: {e}")
+
+    # Sort instances by dimension
+    sorted_instances = sorted(instances, key=lambda x: x[1])
+    return [instance[0] for instance in sorted_instances]
 
 def ratio_to_optimum(found_cost, optimum):
     """
@@ -519,6 +535,6 @@ def filter_2d_euc_tsp_instances(directory_path):
 
 if __name__ == "__main__":
     filter_2d_euc_tsp_instances('./all_tsp')
-    #opt_file = "optimal_solutions.txt"
-    #optimal_solutions = load_optimal_solutions(opt_file)
-    #run_experiments("all_tsp", optimal_solutions, 'results1.csv')
+    opt_file = "optimal_solutions.txt"
+    optimal_solutions = load_optimal_solutions(opt_file)
+    run_experiments("all_tsp", optimal_solutions, 'results.csv')
