@@ -440,83 +440,6 @@ def ratio_to_optimum(found_cost, optimum):
         return 'NA'
     return round(found_cost / optimum, 4)
 
-'''
-def run_experiments(dataset_dir, opt_solutions, output_file="results.csv"):
-    """
-    Executa experimentos para várias instâncias, utilizando diferentes algoritmos e salva os resultados em um arquivo CSV.
-    
-    Parâmetros:
-    dataset_dir: Diretório onde as instâncias do problema estão armazenadas.
-    opt_solutions: Dicionário com as soluções ótimas para as instâncias.
-    output_file: Nome do arquivo CSV onde os resultados serão salvos (padrão: "results.csv").
-    
-    Retorno:
-    None: A função salva os resultados no arquivo especificado e não retorna nenhum valor.
-    """    
-    import contextlib
-    
-    @contextlib.contextmanager
-    def managed_file(filename, mode="a"):
-        f = open(filename, mode, buffering=1)  # Line buffering
-        try:
-            yield f
-        finally:
-            f.flush()
-            f.close()
-
-    # Escreve cabeçalho
-    with managed_file(output_file, "w") as f:
-        f.write("file,optimum,"
-                "bnb_cost,bnb_time,bnb_mem,bnb_ratio,"  # tempo em segundos, mem em KB
-                "tat_cost,tat_time,tat_mem,tat_ratio,"   
-                "christ_cost,christ_time,christ_mem,christ_ratio\n")  
-
-    for inst in list_instances(dataset_dir):
-        print(f"\nProcessando instância: {inst}")
-        coords = read_tsp_file(os.path.join(dataset_dir, inst + ".tsp"))
-        if not coords:
-            print(f"Erro ao processar {inst}: coordenadas vazias.")
-            continue
-        mat = create_distance_matrix(coords)
-        optimum = opt_solutions.get(inst, 'NA')
-
-        # Branch-and-Bound
-        try:
-            bnb_cost, bnb_time, bnb_mem = measure_memory_and_time(branch_and_bound, mat)
-            print(f"Branch-and-Bound finalizado: Custo = {bnb_cost}")
-        except TimeoutError:
-            bnb_cost, bnb_time, bnb_mem = 'NA', 'NA', 'NA'
-            print("Branch-and-Bound atingiu o tempo limite.")
-        bnb_ratio = ratio_to_optimum(bnb_cost, optimum)
-
-        # TAT
-        try:
-            tat_cost, tat_time, tat_mem = measure_memory_and_time(twice_around_tree, mat)
-            print(f"Twice-Around-the-Tree finalizado: Custo = {tat_cost}")
-        except Exception as e:
-            tat_cost, tat_time, tat_mem = 'NA', 'NA', 'NA'
-            print(f"Erro em Twice-Around-the-Tree: {e}")
-        tat_ratio = ratio_to_optimum(tat_cost, optimum)
-
-        # Christofides
-        try:
-            christ_cost, christ_time, christ_mem = measure_memory_and_time(christofides, mat)
-            print(f"Christofides finalizado: Custo = {christ_cost}")
-        except Exception as e:
-            christ_cost, christ_time, christ_mem = 'NA', 'NA', 'NA'
-            print(f"Erro em Christofides: {e}")
-        christ_ratio = ratio_to_optimum(christ_cost, optimum)
-
-        # Escrita dos resultados
-        with managed_file(output_file) as f:
-            f.write(
-                f"{inst},{optimum},"
-                f"{bnb_cost},{bnb_time},{bnb_mem},{bnb_ratio},"
-                f"{tat_cost},{tat_time},{tat_mem},{tat_ratio},"
-                f"{christ_cost},{christ_time},{christ_mem},{christ_ratio}\n"
-            )
-'''
-
 def run_experiments(dataset_dir, opt_solutions, output_file_prefix="results", algorithm="all"):
     """
     Executa experimentos para várias instâncias usando algoritmos específicos e salva os resultados em arquivos CSV.
@@ -640,6 +563,6 @@ if __name__ == "__main__":
 
     # Testes em todas as instâncias
     filter_2d_euc_tsp_instances('./all_tsp')     # Remove as instâncias cujas distâncias não são Euclidianas 2D
-    # run_experiments("all_tsp", optimal_solutions, 'results', 'tat')
+    run_experiments("all_tsp", optimal_solutions, 'results', 'tat')
     run_experiments("all_tsp", optimal_solutions, 'results', 'christ')
     run_experiments("all_tsp", optimal_solutions, 'results', 'bnb')

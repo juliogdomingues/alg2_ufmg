@@ -1,0 +1,187 @@
+\documentclass[12pt]{article}
+
+\usepackage{sbc-template}
+%\usepackage{hyperref}
+\usepackage{graphicx, url}
+% \usepackage[utf8]{inputenc}
+\usepackage[mathletters]{ucs}
+%\usepackage{biblatex}
+%\usepackage[numbers]{natbib}
+\usepackage[utf8x]{inputenc}
+\usepackage[brazil]{babel}
+% \usepackage[latin1]{inputenc}  
+\usepackage{csquotes}
+\usepackage{epigraph} 
+\usepackage{mathtools}
+\usepackage{listings}
+\usepackage{pgfplotstable}
+\usepackage{float}
+\usepackage{adjustbox}
+
+\sloppy
+
+\title{Relatório -- Trabalho Prático 2\\
+\large{Soluções para problemas difícies}
+}
+
+\author{Gustavo Chaves Ferreira\inst{1} (2022043329), Júlio Guerra Domingues\inst{1} (2022431280)}
+
+\address{Departamento de Ciência da Computação -- Universidade Federal de Minas Gerais
+  (UFMG)\\
+  Belo Horizonte -- MG -- Brasil}
+
+\begin{document} 
+
+\maketitle
+
+\begin{abstract}
+This article presents the implementation and analysis of three algorithms applied to the Geometric Traveling Salesman Problem: an exact approach using the \textit{Branch-and-Bound} method and two approximations based on the \textit{Twice-Around-the-Tree} and \textit{Christofides} algorithms. Experiments were conducted with instances from the TSPLIB library and reduced instances, evaluating performance in terms of execution time, memory usage, and solution quality. Results demonstrate that \textit{Branch-and-Bound} is better suited for small instances, while \textit{Christofides} stands out as the best balance between quality and efficiency in larger instances. The \textit{Twice-Around-the-Tree} proved to be a viable alternative when speed is a priority, even with some precision loss. The analyses highlight that the choice of algorithm depends on the instance's characteristics and computational constraints.
+\end{abstract}
+
+\begin{resumo}
+O presente artigo aborda a implementação e análise de três algoritmos aplicados ao problema do Caixeiro Viajante Geométrico: uma abordagem exata utilizando o método \textit{Branch-and-Bound} e duas aproximações baseadas nos algoritmos \textit{Twice-Around-the-Tree} e \textit{Christofides}. Foram conduzidos experimentos com instâncias da biblioteca TSPLIB e instâncias reduzidas, avaliando desempenho em termos de tempo de execução, uso de memória e qualidade das soluções obtidas. Os resultados demonstram que o \textit{Branch-and-Bound} é mais adequado para instâncias pequenas, enquanto o \textit{Christofides} se destaca por oferecer o melhor equilíbrio entre qualidade e eficiência em instâncias maiores. O \textit{Twice-Around-the-Tree} mostrou-se uma alternativa viável quando rapidez é prioritária, mesmo com perda de precisão. As análises reforçam que a escolha do algoritmo depende das características da instância e das restrições computacionais.
+  
+\end{resumo}
+
+\section{Introdução}
+
+O \textit{Traveling Salesman Problem} (TSP) é um problema bastante estudado dentro da área de complexidade computacional e que pode ser descrito da seguinte maneira: dado um conjunto de cidades, deseja-se determinar se existe uma rota para se visitar cada uma delas exatamente uma única vez e retornar ao ponto de partida. Ademais, o mesmo também pode ser abordado sob a ótica da otimização combinatória: busca-se determinar a menor rota que não viola as restrições descritas acima. Neste trabalho, serão apresentadas implementações de três algoritmos para se resolver o TSP com base em um problema de minimização. Vale ressaltar que as instâncias para teste estarão restritas àquelas classificadas como geométricas (onde considera-se que os pontos estão em um espaço euclidiano e nas quais a desigualdade triangular é sempre válida).
+
+A primeira abordagem utiliza-se da estratégia conhecida como \textit{Branch-and-Bound}. Através da exploração de árvores de decisão, realizando-se podas nos caminhos que garantidamente não levarão a uma solução melhor do que a encontrada até então, a mesma oferece uma forma de se determinar a solução ótima para um dado problema em que se busca maximizar ou minimizar uma função objetivo. Apesar de, no pior caso, o \textit{Branch-and-Bound} ainda ter que visitar um número não polinomial de nós, em alguns casos o mesmo pode realizar podas que cortam de forma significativa o número de casos a serem explorados, gerando uma resposta em um tempo significativamente menor do que uma solução força bruta.
+
+A segunda e terceira implementações descritas são consideradas algoritmos aproximativos. Ao se deparar com problemas \textit{NP-difíceis}, como a versão de otimização do TSP, muitas vezes pode ser útil determinar soluções não necessariamente perfeitas, mas que possam ser encontradas em tempo polinomial determinístico e que estejam dentro de um fator de qualidade do ótimo real para cada instância.
+
+Dado o valor da solução ótima $f(s*)$ de um problema de maximização e uma outra solução $f(s_a)$ que aproxima a primeira, definimos a razão de acurácia da última como:
+
+$$ r(s_a) = \frac{f(s^*)}{r(s_a)} $$
+
+Por outro lado, tratando-se de um problema de minimização, dado o valor de sua solução ótima $f(s*)$ e uma outra solução $f(s_a)$ que aproxima a primeira, definimos a razão de acurácia da última como:
+
+$$ r(s_a) = \frac{f(s_a)}{f(s^*)} $$
+
+Um algoritmo \textit{c}-aproximativo de tempo polinomial é definido como aquele onde a taxa de acurácia $r(s_a)$ da aproximação que ele produz não excede \textit{c} para nenhuma instância do problema em questão:
+
+$$ r(s_a) \leq c $$
+
+O melhor valor para o qual a desigualdade acima é válida é chamado de fator de aproximação.
+
+O algoritmo conhecido como \textit{Twice-Around-the-Tree} fundamenta-se no fato de que remover uma aresta de um ciclo Hamiltoniano origina uma árvore geradora. Ao percorrer especificamente a árvore geradora mínima com suas as arestas duplicadas (não considerando vértices que já foram visitados), ele é capaz de obter uma trajetória que custa, no máximo, duas vezes mais do que o ótimo. Logo, ele possui um fator de aproximação igual à $2$.  
+
+Já aquele conhecido como algoritmo de \textit{Christofides} inspira-se na mesma ideia. Porém, tendo em mãos a árvore geradora mínima (MST) de um grafo, ele a une ao emparelhamento perfeito de menor peso do subgrafo induzido pelos vértices de grau ímpar da MST em questão. Feito isso, a estrutura resultante é percorrida em um circuito Euleriano, novamente ignorando-se vértices já visitados. O caminho obtido possui custo até 1.5 vezes maior do que o ótimo real. Esse é o seu fator aproximativo. 
+
+Informações detalhadas sobre o funcionamento de cada um deles podem ser encontradas em materiais como \cite{levitin}.
+
+As características e o desempenho das algoritmos que usam as abordagens descritas foram avaliados em instâncias da biblioteca TSPLIB, disponbilizadas e descritas em \cite{tsp_instances_desc}, considerando-se as seguintes métricas: tempo de execução, uso de memória e qualidade das soluções obtidas (em comparação ao ótimo real).
+
+O objetivo deste trabalho é compreender os desafios práticos de implementação, identificar cenários onde soluções exatas são aplicáveis e avaliar a eficiência de abordagens aproximativas em instâncias de maior escala. O relatório está estruturado para apresentar as escolhas de implementação, os experimentos realizados e os resultados obtidos.
+
+\section{Implementação}
+
+Optou-se pela utilização de representações otimizadas para grafos completamente conexos, típicos do TSP euclidiano. Para os algoritmos \textit{Twice-Around-the-Tree} e de \textit{Christofides}, utilizou-se a biblioteca Networkx \cite{networkx}, que simplifica a manipulação de grafos. No entanto, reconhece-se que sua otimização para grafos esparsos introduz sobrecarga desnecessária no contexto de grafos densos. Assim, empregou-se a matriz de adjacências no branch-and-bound, devido ao acesso rápido aos pesos das arestas e menor consumo de memória comparado a listas de adjacências com ponteiros.
+
+Os métodos presentes no código fonte e que serão descritos a seguir podem ser encontradas no arquivo \textit{Python} nomeado \textit{main.py}, presente no mesmo repositório em que esse artigo se encontra. 
+
+Demais métodos ocasionalmente não discutidos aqui desempenham o papel de auxilares na leitura dos arquivos de entrada ou na execução dos testes propostos. O próprio código fonte contém explicações a respeito do funcionamento de cada um deles. 
+
+\subsection{Algoritmo Twice-Around-the-Tree}
+
+A função \textit{twice-around-the-tree} é a responsável pela implementação do mesmo. Um grafo é gerado a partir da matriz de adjacência de cada instância, aproveitando-se da bilbioteca Networkx. Utilizando-se também das facilidades ofertadas pela mesma, a MST de tal estrutura é encontrada. Por fim, o método \textit{pre-order-dfs} implementa uma busca pré-ordem em profundidade na árvore geradora mínima, o que é equivalente a percorrer um circuito Euleriano na MST obtida não considerando vértices repetidos. O custo de tal percurso é retornado.
+
+A complexidade do \textit{Twice-Around-the-Tree} é dominada pela contrução da árvore citada, tendo custo total de $O(|E| lg(|V|))$, onde $E$ é o conjunto de arestas do grafo de entrada e $V$ o de vértices.
+
+\subsection{Algoritmo Christofides}
+
+A função \textit{christofides} é a encarregada por implementar do algoritmo em questão. Novamente, um grafo é gerado com o auxílio da bilbioteca Networkx. A função \textit{min-weight-matching} encontra o emparelhamento mais barato entre os vértices de grau ímpar. Ademais, a MST da entrada é também computada. Então, após combinadas as duas estruturas, 
+um caminhamento euleriano é realizado na união resultante a partir do método \textit{compute-eulerian-circuit}, que usa uma lista para simular a estrutura de uma pilha e percorrer todas as arestas de acordo com a lista de vizinhos de cada um dos vértices. O custo do \textit{tour} encontrado após repetições de vértices no caminhamento terem sido removidas é retornado.   
+
+A sua complexidade é dominada pelo cálculo do emparelhamento perfeito, sendo da ordem de $O(|V|³)$, onde V é o conjunto de vértices (ou cidades) da instância em questão.
+
+\subsection{Algoritmo Branch-and-Bound}
+
+A função \textit{branch-and-bound} contém toda a lógica responsável pela execução do mesmo (com chamadas à funções auxiliares). 
+
+Cada nó da árvore de espaços de busca gerada pelo algoritmo é implementado pela classe \textit{Node}. Ela é a responsável por armazenar o caminho parcial representado por cada nodo, além de computar, no momento de instanciação de cada um dos objetos da classe, um limiar inferior para o custo do menor caminho que poderá ser obtido a partir dos vértices restantes com o auxílio do método \textit{compute-bound}. Esse \textit{bound} é calculado da seguinte maneira: para cada uma das cidades, soma-se em um acumulador $bound$ os custos das duas arestas de menor custo incidentes a ela. O resultado final é dividido por 2, já que nessa lógica arestas são contadas de forma duplicada, e a operação $\lceil bound \rceil$ é aplicada. Vale ressaltar que, nos casos em que duas arestas incidentes a uma cidade já tiverem sido definidas pelo caminho representado pelo nó atual, o valor dessas arestas substitui o valor das arestas de menor custo incidentes à cidade atual na soma do limiar. No caso em que apenas uma das arestas já tiver sido fixada, o custo da segunda aresta de menor custo é substituído no cálculo de $bound$.
+
+A exploração da árvore que é iterativamente construída se dá com base na estratégia de \textit{Best First}. Nela, a cada momento em que é preciso se tomar a decisão de qual novo nó expandir, aquele que possui o menor limiar é o selecionado. Tal lógica é implementada atráves do uso de uma fila de prioriedades. Ao longo da execução do TSP, nodos são adicionados e removidos da estrutura de dados para representar tal heurística.
+
+Se em um dado momento, algum nó é gerado no nível $|V|-1$ (considerando que o nível da árvore que contém a raiz é o $0$), então o \textit{tour} é finalizado adicionando-se o vértice de índice 0 no caminho parcial encontrado até então (note que pode-se iniciar o circuito Hamiltoniano em um vértice arbitrário, visto que o custo mínimo final será sempre o mesmo). Nesse instante, o custo do \textit{loop} encontrado é calculado e, caso ele seja melhor do que o do \textit{tour} mais barato encontrado até agora, ele passa a ser tratado com o ótimo parcial. A variável que armazena tal valor é inicializada para representar o maior valor positivo possível ('infinto positivo').
+
+O diferencial do algoritmo de \textit{Branch-and-Bound} encontra-se no fato de que nós cujos limiares sejam mais caros do que o valor de ótimo global parcial são podados (ou seja, retirados da fila de prioridades para não serem explorados). O uso da estratégia \textit{Best First} almeja, dentre outras coisas, determinar o mais cedo possível uma solução ótima parcial para que as podas sejam feitas o quanto antes. Com isso, potencialmente, ramos contendo uma quantidade exponencial de nós não precisarão ser explorados, e um atalho para a resposta final é tomado.
+
+Para certos casos, espera-se que tal abordagem reduza exponencialmente o custo de execução do algoritmo final. Entretanto, tal afirmação não é válida para o caso geral que considera qualquer instância. Portanto, no pior caso, o custo de execução da função \textit{branch-and-bound} é não polinomial, mais precisamente de $O(|V|!)$, sendo da mesma ordem de um algoritmo força bruta que exploraria uma a uma todas as possíveis combinações de caminhos que podem ser soluções do TSP (considerando um computador determinístico).
+
+\section{Experimentos}
+
+Os experimentos foram conduzidos com as instâncias geométricas disponíveis da TSPLIB. Cada algoritmo foi testado com tempo limite de 30 minutos por instância. Adicionalmente, foram criadas instâncias modificadas com 5 e 10 vértices a partir das instâncias \texttt{eil51} e \texttt{berlin52}, removendo vértices considerados de menor relevância. A relevância foi definida pelo grau de conectividade dos vértices na árvore geradora mínima, com vértices menos conectados sendo eliminados. Estas instâncias foram utilizadas para testar o funcionamento do \textit{Branch-and-Bound} e compará-lo com os algoritmos aproximativos.
+
+As métricas avaliadas incluem:
+\begin{itemize}
+    \item \textbf{Custo}: Representa o valor total da solução encontrada para o problema do Caixeiro Viajante.
+    \item \textbf{Razão com o Ótimo}: Calculada como $\frac{Custo_{encontrado}}{Custo_{ótimo}}$, é utilizada para medir a eficiência de algoritmos aproximativos em relação ao ótimo.
+    \item \textbf{Tempo de Execução}: Monitorado em segundos, reflete o tempo total necessário para que o algoritmo encontre uma solução.
+    \item \textbf{Uso de Memória}: Mede o pico de memória alocada pelo algoritmo durante sua execução, registrado em kilobytes (KB), utilizando a biblioteca \texttt{tracemalloc}.
+\end{itemize}
+
+\section{Resultados e discussão}
+
+De forma geral, os resultados indicam que os algoritmos aproximativos oferecem um compromisso interessante entre tempo de execução e qualidade da solução, enquanto o \textit{Branch-and-Bound} é limitado a instâncias menores devido ao seu crescimento exponencial de complexidade. Os resultados completos estão apresentados na Tabela \ref{tab:resultados}.
+
+O Branch-and-Bound foi testado em instâncias reduzidas para avaliar sua viabilidade. Nas instâncias com 5 e 10 vértices, ele conseguiu encontrar a solução ótima dentro do limite de tempo. Contudo, em instâncias com 15 vértices, observou-se um aumento significativo no tempo de execução e no uso de memória, limitando sua escalabilidade. O algoritmo apresentou resultados consistentes com sua natureza exata.
+
+O \textit{Twice-Around-the-Tree} proporcionou soluções rápidas, respeitando o fator de aproximação de até 2 vezes. Sua eficiência em termos de tempo o torna ideal para casos onde a qualidade pode ser sacrificada em prol de maior velocidade.
+
+O algoritmo de \textit{Christofides} apresentou um equilíbrio entre tempo e qualidade, com fator de aproximação limitado a 1,5. Ele se mostrou eficiente em instâncias médias, sendo uma boa alternativa ao \textit{Branch-and-Bound} quando o tempo de execução é uma restrição.
+
+Durante a execução de instâncias maiores (superiores a 10.000 vértices) houve encerramento do programa pelo sistema. Esse comportamento foi atribuído ao consumo excessivo de memória causado pelo tamanho das estruturas necessárias para armazenar e processar o grafo completo. Tal comportamento evidencia a limitação do sistema em alocar recursos suficientes para processar instâncias grandes, reforçando a necessidade de otimizações ou ajustes para cenários de alta escala.
+
+\subsection{Análise das Instâncias Modificadas}
+As instâncias reduzidas, criadas a partir de \texttt{eil51} e \texttt{berlin52}, foram úteis para validar o desempenho do \textit{Branch-and-Bound}. Em comparação com aos algoritmos aproximativos, o Branch-and-Bound alcançou a solução ótima, enquanto o \textit{Twice-Around-the-Tree} e o \textit{Christofides} ofereceram soluções com razões de 1,8 e 1,4 em média, respectivamente. Tais achados reforçam a aplicabilidade do Branch-and-Bound em instâncias pequenas e dos algoritmos aproximativos em cenários maiores ou mais restritos em termos de recursos computacionais.
+
+\newpage
+\subsection{Resultados completos}
+\begin{table}[H]
+\centering
+\caption{Resultados compilados dos experimentos.}
+\label{tab:resultados_compilados}
+\adjustbox{max width=\textwidth}{ 
+\pgfplotstabletypeset[
+    col sep=comma,
+    string type,
+    header=true,
+    every head row/.style={before row=\hline, after row=\hline},
+    every last row/.style={after row=\hline},
+    columns/file/.style={column name=Instância},
+    columns/optimum/.style={column name=Ótimo},
+    columns/tat_cost/.style={column name=TaT (Custo)},
+    columns/tat_time/.style={column name=TaT (Tempo)},
+    columns/tat_mem/.style={column name=TaT (Memória)},
+    columns/tat/opt_ratio/.style={column name=TaT / Opt},
+    columns/christ_cost/.style={column name=Christ (Custo)},
+    columns/christ_time/.style={column name=Christ (Tempo)},
+    columns/christ_mem/.style={column name=Christ (Memória)},
+    columns/christ/opt_ratio/.style={column name=Christ / Opt},
+    columns/bnb_cost/.style={column name=BnB (Custo)},
+    columns/bnb_time/.style={column name=BnB (Tempo)},
+    columns/bnb_mem/.style={column name=BnB (Memória)},
+    columns/bnb/opt_ratio/.style={column name=BnB / Opt},
+]{compiledresults.csv}
+}
+\vspace{0.3cm}
+\begin{minipage}{\textwidth}
+\footnotesize
+\textbf{Nota:} Instâncias marcadas com `*` foram criadas a partir da redução das menores instâncias originais, removendo vértices de menor relevância. \textbf{Abreviações:} \textbf{TaT} = \textit{Twice-Around-the-Tree}, \textbf{Christ} = \textit{Christofides}, \textbf{BnB} = \textit{Branch-and-Bound}, \textbf{Custo} = Custo da solução encontrada, \textbf{Tempo} = Tempo de execução (segundos), \textbf{Memória} = Memória máxima utilizada (KB), \textbf{/ Opt} = Razão entre o custo encontrado e o ótimo.
+\end{minipage}
+\end{table}
+
+
+Os experimentos mostraram que não existe uma abordagem única que resolva de forma ideal todos os cenários possíveis. A seleção do método mais adequado está intrinsicamente ligada às restrições específicas de cada problema e aos requisitos de precisão, tempo de execução e consumo de recursos computacionais. Para instâncias de menor escala, em que a obtenção de uma solução exata é imprescindível, o \textit{Branch-and-Bound} se mostrou como a escolha mais apropriada. Já para problemas de maior escala, o \textit{Christofides} apresentou-se como a opção mais robusta, equilibrando qualidade e eficiência de maneira consistente. Por outro lado, o \textit{Twice-Around-the-Tree} é particularmente vantajoso em cenários onde a rapidez na obtenção da solução é a principal prioridade, ainda que com um comprometimento maior na qualidade da resposta encontrada.
+
+\section{Conclusão}
+Este trabalho explorou três abordagens distintas para o problema do Caixeiro Viajante Geométrico, destacando os desafios e as limitações de cada uma. O \textit{Branch-and-Bound} se provou ser eficiente para instâncias menores, oferecendo soluções ótimas em tempo prático, mas sua escalabilidade é limitada pelo crescimento não polinomal de sua complexidade. Já os algoritmos aproximativos \textit{Twice-Around-the-Tree} e \textit{Christofides} demonstraram um equilíbrio entre tempo de execução e qualidade da solução, sendo mais adequados para instâncias maiores, em especial nos casos em que uma resposta exata é computacionalmente inexequível de ser obtida, mas onde ainda assim uma resposta (ainda que com uma margem de erro moderada) precisa ser obtida.
+
+A realização de todas as etapas do trabalho prático, incluindo o desenvolvimento de código e do relatório final, favoreceram uma maior compreensão do conteúdo trabalhado em sala de aula ao longo da disciplina, em especial no último terço do curso, e permitiram o contato dos autores com instâncias reais, as quais exigem um maior grau de elaboração sob o ponto de vista algorítmico para serem solucionadas. 
+
+\newpage
+\bibliographystyle{sbc}
+\bibliography{sbc-template}
+\end{document}
