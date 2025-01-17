@@ -640,6 +640,6 @@ if __name__ == "__main__":
 
     # Testes em todas as instâncias
     filter_2d_euc_tsp_instances('./all_tsp')     # Remove as instâncias cujas distâncias não são Euclidianas 2D
-    run_experiments("all_tsp", optimal_solutions, 'results', 'tat')
+    # run_experiments("all_tsp", optimal_solutions, 'results', 'tat')
     run_experiments("all_tsp", optimal_solutions, 'results', 'christ')
     run_experiments("all_tsp", optimal_solutions, 'results', 'bnb')
